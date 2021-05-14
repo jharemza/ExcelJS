@@ -122,8 +122,8 @@
       
         var dmp = new diff_match_patch();
 
-        var text1 = document.getElementById('text1').value;
-        var text2 = document.getElementById('text2').value;
+        var text1 = json[key]["Previous"];
+        var text2 = json[key]["Current"];
         dmp.Diff_Timeout = parseFloat(document.getElementById('timeout').value);
         dmp.Diff_EditCost = parseFloat(document.getElementById('editcost').value);
 
