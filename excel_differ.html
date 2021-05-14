@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Importing SheetJS for Excel Documentation can be found at https://docs.sheetjs.com/-->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.16.8/dist/xlsx.full.min.js"
+    integrity="sha256-Ic7HP804IrYks4vUqX1trFF1Nr33RjONeJESZnYxsOY=" crossorigin="anonymous"></script>
+
+  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+
+  <!-- Diff Match and Patch by Neil Fraser
+  Sample of Diff located at  https://neil.fraser.name/software/diff_match_patch/demos/diff.html 
+  Neil's github repo can be found at https://github.com/google/diff-match-patch -->
+  <script src="../javascript/diff_match_patch.js"></script>
+
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.bundle.min.js"
+    integrity="sha384-6khuMg9gaYr5AxOqhkVIODVIvm9ynTT5J4V1cfthmT+emCG6yVmEZsRHdxlotUnm"
+    crossorigin="anonymous"></script>
+</head>
+
+<style>
+</style>
+
+<body>
+  <div class="container">
+    <div class="row bg-primary text-white text-lg-right">
+      <p class="h1">Excel Text Differ One Page App</p><br>
+    </div>
+    <div class="row">
+      <p class="h2">What is a Diff?</p>
+      <p>Diff takes two texts and finds the differences.  This implementation works on a character by character basis.
+        The result of any diff may contain 'chaff', irrelevant small commonalities which complicate the output.
+        A post-diff cleanup algorithm factors out these trivial commonalities.</p>
+    </div>
+    <div class="row">
+      <div class="col-4">
+        <div class="row">
+          <div class="card w-100 m-1">
+            <div class="card-body">
+              <p class="h4">Instructions:</p>
+              <ol>
+                <li>Your Excel file should include exactly 2 columns.</li>
+                <li>Your Excel file should include exactly 1 row for headers.</li>
+                <li>The headers row should be the first row.</li>
+                <li>The leftmost header column should be labeled <b>Previous</b>.</li>
+                <li>The rightmost header column should be labeled <b>Current</b>.</li>
+                <li>Drag your file into the grey box below.</li>
+                <li>Copy and paste your results.</li>
+              </ol>
+            </div>
+          </div>
+          <div class="card w-100 m-1">
+            <div class="card-body">
+              <p class="h4">Text Differ Options:</p>
+              <dl>
+                <dt><input type="radio" name="cleanup" id="semantic" checked="">
+                <label for="semantic">Semantic Cleanup</label></dt>
+                <dd>Increase human readability by factoring out commonalities which are likely to be
+                coincidental.</dd>
+                <dt><input type="radio" name="cleanup" id="efficiency">
+                <label for="efficiency">Efficiency Cleanup</label>,
+                edit cost: <input type="text" size="3" maxlength="5" value="4" id="editcost">
+                </dt><dd>Increase computational efficiency by factoring out short commonalities which are
+                not worth the overhead.  The larger the edit cost, the more aggressive the cleanup.</dd>
+                <dt><input type="radio" name="cleanup" id="raw">
+                <label for="raw">No Cleanup</label></dt>
+                <dd>Raw output.</dd>
+              </dl>
+            </div>
+          </div>
+          <div class="card w-100 m-1">
+            <div class="card-body">
+              <p class="h4">Diff timeout:</p>
+              <p><input type="text" size="3" maxlength="5" value="1" id="timeout"> seconds<br>
+                If the mapping phase of the diff computation takes longer than this, then the computation
+                is truncated and the best solution to date is returned.  While guaranteed to be correct,
+                it may not be optimal.  A timeout of '0' allows for unlimited computation.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="resultcolumn" class="col-8">
+        <div class="row">
+          <div id="drop_zone" class="card bg-secondary d-flex w-100 m-1" ondrop="dropHandler(event);"
+            ondragover="dragOverHandler(event);">
+            <div class="card-body align-items-center d-flex" style="min-height: 350px;">
+              <p class="text-light text-center w-100">Drag your Excel file into this box.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+
+
+<script>
+  function dropHandler(e) {
+    e.stopPropagation(); e.preventDefault();
+    var files = e.dataTransfer.files, f = files[0];
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var data = new Uint8Array(e.target.result);
+      var workbook = XLSX.read(data, { type: 'array' });
+
+      var first_sheet_name = workbook.SheetNames[0];
+      var worksheet = workbook.Sheets[first_sheet_name];
+      var json = XLSX.utils.sheet_to_json(worksheet);
+
+      $('#drop_zone').remove();
+
+
+      for (var key in json) {
+      
+        var dmp = new diff_match_patch();
+
+        var text1 = document.getElementById('text1').value;
+        var text2 = document.getElementById('text2').value;
+        dmp.Diff_Timeout = parseFloat(document.getElementById('timeout').value);
+        dmp.Diff_EditCost = parseFloat(document.getElementById('editcost').value);
+
+        var ms_start = (new Date()).getTime();
+        var d = dmp.diff_main(text1, text2);
+        var ms_end = (new Date()).getTime();
+
+        if (document.getElementById('semantic').checked) {
+          dmp.diff_cleanupSemantic(d);
+        }
+        if (document.getElementById('efficiency').checked) {
+          dmp.diff_cleanupEfficiency(d);
+        }
+        var ds = dmp.diff_prettyHtml(d);
+
+        var card = $('<div/>').addClass('row').append($('<div/>').addClass('card w-100 m-1').append($('<div/>').addClass('card-body').html(ds))
+
+        $('#resultcolumn').append(card);
+
+      }
+    };
+    reader.readAsArrayBuffer(f);
+    console.log('File(s) dropped');
+  };
+
+  function dragOverHandler(e) {
+    e.preventDefault();
+  };
+
+</script>
